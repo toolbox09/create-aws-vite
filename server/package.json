@@ -1,0 +1,8 @@
+{
+  "name": "@test-repo/server",
+  "private": true,
+  "scripts": {
+    "dev": "cargo watch -x run -w src",
+    "build": "cargo build --release"
+  }
+}

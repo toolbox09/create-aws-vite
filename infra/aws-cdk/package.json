@@ -1,0 +1,36 @@
+{
+  "name": "@test-repo/infra",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "deploy:ecr": "cdk deploy test-repo-ecr --require-approval broadening",
+    "deploy:dev": "cdk deploy test-repo-dev --require-approval broadening",
+    "deploy:prod": "cdk deploy test-repo-prod --require-approval broadening",
+    "destroy:dev": "cdk destroy test-repo-dev",
+    "destroy:prod": "cdk destroy test-repo-prod",
+    "destroy:prod:force": "cdk destroy test-repo-prod -c protectData=false",
+    "destroy:ecr": "cdk destroy test-repo-ecr",
+    "destroy:all:dev": "cdk destroy test-repo-dev test-repo-ecr",
+    "diff:dev": "cdk diff test-repo-dev",
+    "diff:prod": "cdk diff test-repo-prod",
+    "docker:build": "docker build -t test-repo ../../server",
+    "docker:push": "node scripts/docker-push.js latest",
+    "docker:push:prod": "node scripts/docker-push.js prod",
+    "deploy:web": "node scripts/deploy-web.js dev",
+    "deploy:web:prod": "node scripts/deploy-web.js prod"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.170.0",
+    "constructs": "^10.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "aws-cdk": "^2.170.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.0"
+  }
+}

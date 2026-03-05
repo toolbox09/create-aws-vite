@@ -1,0 +1,17 @@
+{
+  "name": "test-repo",
+  "private": true,
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:web": "turbo run dev --filter=@test-repo/web",
+    "dev:server": "turbo run dev --filter=@test-repo/server",
+    "build": "turbo run build",
+    "build:web": "turbo run build --filter=@test-repo/web",
+    "build:server": "turbo run build --filter=@test-repo/server",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0"
+  },
+  "packageManager": "pnpm@10.19.0"
+}
