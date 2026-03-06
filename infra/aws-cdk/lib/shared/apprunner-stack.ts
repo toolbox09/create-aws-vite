@@ -159,7 +159,7 @@ export class AppRunner extends Construct {
       },
       healthCheckConfiguration: {
         protocol: "HTTP",
-        path: "/health",
+        path: "/api/health",
         interval: isProd ? 10 : 20,
         timeout: 5,
         healthyThreshold: 1,
