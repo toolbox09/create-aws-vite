@@ -66,6 +66,11 @@ test-repo/
 - **API error handling**: `AppError` enum in `errors.rs` with `From<sqlx::Error>` and `From<anyhow::Error>` impls.
 - **Prod data protection**: RDS and S3 use `RemovalPolicy.RETAIN` and `deletionProtection` by default. Use `destroy:prod:force` to override.
 
+## Verification
+
+- `pnpm build:web` 성공 = 검증 완료. 브라우저 스크린샷/Playwright 확인 불필요.
+- 빌드 실패 시에만 디버깅.
+
 ## Environment
 
 Server expects `.env` file (see `.env.example`):
