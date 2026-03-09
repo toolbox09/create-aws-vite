@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 
 const HomePage = lazy(() => import("./pages/home/home-page"));
@@ -88,8 +88,70 @@ function Loading() {
   );
 }
 
+const SITE_PASS = "123456As!!";
+const STORAGE_KEY = "site-auth";
+
+function SiteGate({ children }: { children: React.ReactNode }) {
+  const [authed, setAuthed] = useState(
+    () => localStorage.getItem(STORAGE_KEY) === "1",
+  );
+  const [input, setInput] = useState("");
+  const [error, setError] = useState(false);
+
+  if (authed) return <>{children}</>;
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (input === SITE_PASS) {
+      localStorage.setItem(STORAGE_KEY, "1");
+      setAuthed(true);
+    } else {
+      setError(true);
+      setTimeout(() => setError(false), 1500);
+    }
+  }
+
+  return (
+    <div className="flex min-h-svh items-center justify-center bg-background px-4">
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-[360px] rounded-2xl bg-card ring-1 ring-black/[0.08] shadow-sm p-8 space-y-6 animate-fade-up"
+      >
+        <div className="text-center space-y-2">
+          <img src="/logo.svg" alt="콘마켓" className="h-7 mx-auto" />
+          <p className="text-sm text-muted-foreground">
+            접근이 제한된 페이지입니다
+          </p>
+        </div>
+        <div className="space-y-2">
+          <input
+            type="password"
+            placeholder="비밀번호를 입력하세요"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            autoFocus
+            className={`w-full rounded-xl h-11 px-4 text-sm ring-1 bg-background outline-none transition-colors focus:ring-primary ${
+              error ? "ring-red-500" : "ring-black/[0.08]"
+            }`}
+          />
+          {error && (
+            <p className="text-xs text-red-500">비밀번호가 올바르지 않습니다</p>
+          )}
+        </div>
+        <button
+          type="submit"
+          className="w-full h-11 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors"
+        >
+          확인
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export default function App() {
   return (
+    <SiteGate>
     <BrowserRouter>
       <Toaster position="top-center" richColors closeButton />
       <Suspense fallback={<Loading />}>
@@ -153,5 +215,6 @@ export default function App() {
         </Routes>
       </Suspense>
     </BrowserRouter>
+    </SiteGate>
   );
 }
