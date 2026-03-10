@@ -25,8 +25,10 @@
     /* Path aliases */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@conmarket/apis": ["../apis/index.ts"],
+      "@conmarket/apis/*": ["../apis/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "../apis"]
 }

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -8,7 +8,6 @@ const LoginPage = lazy(() => import("./pages/auth/login-page"));
 const PartnerSearchPage = lazy(() => import("./pages/partner/partner-search-page"));
 const PartnerDetailPage = lazy(() => import("./pages/partner/partner-detail-page"));
 const PortfolioDetailPage = lazy(() => import("./pages/partner/portfolio-detail-page"));
-const PublicArchitectSearchPage = lazy(() => import("./pages/partner/public-architect-search-page"));
 const AiProjectListPage = lazy(() => import("./pages/analysis/ai-project-list-page"));
 const AiProjectDetailPage = lazy(() => import("./pages/analysis/ai-project-detail-page"));
 const AiReportPage = lazy(() => import("./pages/analysis/ai-report-page"));
@@ -161,7 +160,7 @@ export default function App() {
           <Route path="/partners" element={<PartnerSearchPage />} />
           <Route path="/partners/:id" element={<PartnerDetailPage />} />
           <Route path="/partners/:id/portfolio/:portfolioId" element={<PortfolioDetailPage />} />
-          <Route path="/architects" element={<PublicArchitectSearchPage />} />
+          <Route path="/architects" element={<Navigate to="/partners?view=permits" replace />} />
           <Route path="/analysis/ai" element={<AiProjectListPage />} />
           <Route path="/analysis/ai/new" element={<AiProjectDetailPage />} />
           <Route path="/analysis/ai/:id" element={<AiProjectDetailPage />} />
@@ -188,7 +187,7 @@ export default function App() {
           <Route path="/projects/:id/review" element={<ProjectReviewPage />} />
           <Route path="/auth/password-find" element={<PasswordFindPage />} />
           <Route path="/auth/password-reset" element={<PasswordResetPage />} />
-          <Route path="/architects/:id" element={<PublicArchitectDetailPage />} />
+          <Route path="/public-architects/:id" element={<PublicArchitectDetailPage />} />
           <Route path="/portfolio" element={<PortfolioListPage />} />
           <Route path="/portfolio/new" element={<PortfolioCreatePage />} />
           <Route path="/portfolio/:id/edit" element={<PortfolioEditPage />} />

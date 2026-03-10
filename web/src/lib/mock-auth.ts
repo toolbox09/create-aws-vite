@@ -1,6 +1,7 @@
 import { create } from "zustand";
+import type { MeRes } from "@conmarket/apis";
 
-export type UserRole = "CL-P" | "CL-C" | "PT";
+export type UserRole = "CL-P" | "CL-C" | "PT" | "ADMIN";
 
 export interface User {
   name: string;
@@ -12,29 +13,57 @@ export interface User {
 interface AuthState {
   isLoggedIn: boolean;
   user: User | null;
+  setUser: (me: MeRes) => void;
   login: () => void;
   logout: () => void;
   toggleLogin: () => void;
 }
 
-const mockUser: User = {
-  name: "김건축",
-  email: "kim@example.com",
-  role: "CL-P",
-  avatar: null,
-};
+function hasToken() {
+  return !!localStorage.getItem("access_token");
+}
+
+function storedUser(): User | null {
+  try {
+    const raw = localStorage.getItem("auth_user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  isLoggedIn: false,
-  user: null,
-  login: () => set({ isLoggedIn: true, user: mockUser }),
-  logout: () => set({ isLoggedIn: false, user: null }),
+  isLoggedIn: hasToken(),
+  user: storedUser(),
+
+  setUser: (me: MeRes) => {
+    const user: User = {
+      name: me.name,
+      email: me.email,
+      role: me.role as UserRole,
+      avatar: me.avatar_url,
+    };
+    localStorage.setItem("auth_user", JSON.stringify(user));
+    set({ isLoggedIn: true, user });
+  },
+
+  login: () => {
+    set({ isLoggedIn: true, user: storedUser() });
+  },
+
+  logout: () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("auth_user");
+    set({ isLoggedIn: false, user: null });
+  },
+
   toggleLogin: () => {
-    const { isLoggedIn } = get();
+    const { isLoggedIn, logout, login } = get();
     if (isLoggedIn) {
-      set({ isLoggedIn: false, user: null });
+      logout();
     } else {
-      set({ isLoggedIn: true, user: mockUser });
+      login();
     }
   },
 }));

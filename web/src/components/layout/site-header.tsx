@@ -4,19 +4,29 @@ import { toast } from "sonner";
 import { Bell, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/lib/mock-auth";
+import { useMe, useLogout } from "@/features/auth/api/queries";
 
 const navItems = [
   { href: "/map", label: "지도" },
-  { href: "/partners", label: "건축사 찾기" },
+  { href: "/partners", label: "전문가 찾기" },
   { href: "/bids", label: "입찰공고" },
   { href: "/projects", label: "내 프로젝트", authOnly: true },
 ];
 
 export default function SiteHeader() {
   const { pathname } = useLocation();
-  const { isLoggedIn, user, logout, toggleLogin } = useAuthStore();
+  const { isLoggedIn, user, logout: storeLogout, toggleLogin, setUser } = useAuthStore();
+  const { data: meData } = useMe();
+  const logoutMutation = useLogout();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Sync server user data → store (only when data actually changes)
+  const meDataId = meData?.id;
+  useEffect(() => {
+    if (meData && meDataId) setUser(meData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meDataId]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -111,7 +121,12 @@ export default function SiteHeader() {
                   </Link>
                   <button
                     onClick={() => {
-                      logout();
+                      logoutMutation.mutate(undefined, {
+                        onError: () => {
+                          // Even if server logout fails, clear local state
+                          storeLogout();
+                        },
+                      });
                       setDropdownOpen(false);
                     }}
                     className="w-full px-4 py-2 text-left text-sm transition-colors hover:bg-muted"
@@ -132,20 +147,22 @@ export default function SiteHeader() {
             </div>
           )}
 
-          <button
-            onClick={() => {
-              toggleLogin();
-              toast(
-                isLoggedIn
-                  ? "로그아웃 되었습니다"
-                  : "김건축님으로 로그인 되었습니다",
-                { icon: isLoggedIn ? "👋" : "👤" },
-              );
-            }}
-            className="ml-2 text-[10px] text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors"
-          >
-            DEV
-          </button>
+          {import.meta.env.DEV && (
+            <button
+              onClick={() => {
+                toggleLogin();
+                toast(
+                  isLoggedIn
+                    ? "로그아웃 되었습니다"
+                    : "DEV: 토큰 없이 토글됨",
+                  { icon: isLoggedIn ? "👋" : "👤" },
+                );
+              }}
+              className="ml-2 text-[10px] text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors"
+            >
+              DEV
+            </button>
+          )}
         </div>
       </div>
     </header>
