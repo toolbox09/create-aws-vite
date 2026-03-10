@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -23,12 +24,22 @@ import {
   Bell,
   Globe,
   CreditCard,
+  ShieldCheck,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import SiteHeader from "@/components/layout/site-header";
+import { useMe } from "@/features/auth/api/queries";
+import {
+  useProfile,
+  useChangePassword,
+  useNotificationSettings,
+  useUpdateNotificationSettings,
+  useWithdraw,
+} from "@/features/users/api/queries";
 
 /* ─── Types ─── */
 
@@ -144,9 +155,12 @@ const WITHDRAW_REASONS = [
    ═══════════════════════════════════════════════ */
 
 function DashboardContent() {
+  const { data: me } = useMe();
+  const userName = me?.name ?? "회원";
+
   return (
     <div>
-      <h2 className="text-[32px] font-bold -tracking-tight">안녕하세요, 김건축님</h2>
+      <h2 className="text-[32px] font-bold -tracking-tight">안녕하세요, {userName}님</h2>
       <p className="text-base text-muted-foreground mt-2 mb-10">오늘의 활동 현황을 확인하세요</p>
 
       {/* ── Overview Stats (simple inline) ── */}
@@ -542,19 +556,49 @@ function SavedPartnersContent() {
    ═══════════════════════════════════════════════ */
 
 function PersonalContent() {
+  const { data: profile } = useProfile();
+
+  const roleLabel: Record<string, string> = { "CL-P": "건축주 개인", "CL-C": "건축주 법인", "PT": "파트너", "ADMIN": "관리자" };
+  const formatDate = (d?: string) => d ? new Date(d).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" }) : "-";
+
+  const PERSONAL_FIELDS: { label: string; value: string; editType: "identity" | "email-verify" | "editable" | "readonly" | "social" }[] = [
+    { label: "이름", value: profile?.name ?? "-", editType: "identity" },
+    { label: "이메일", value: profile?.email ?? "-", editType: "email-verify" },
+    { label: "휴대폰", value: profile?.phone ?? "-", editType: "identity" },
+    { label: "회원 유형", value: roleLabel[profile?.role ?? ""] ?? "-", editType: "readonly" },
+    { label: "본인인증", value: profile?.identity_verified ? "인증 완료" : "미인증", editType: "readonly" },
+    { label: "소셜 로그인", value: "연동 없음", editType: "social" },
+    { label: "가입일", value: formatDate(profile?.created_at), editType: "readonly" },
+  ];
+
+  function editLabel(type: typeof PERSONAL_FIELDS[number]["editType"]) {
+    switch (type) {
+      case "identity": return "본인인증";
+      case "email-verify": return "수정";
+      case "editable": return "수정";
+      case "social": return "관리";
+      default: return null;
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center gap-4 mb-8">
         <h2 className="text-[32px] font-bold -tracking-tight">개인정보</h2>
-        <span className="text-sm text-muted-foreground bg-muted rounded-full px-3 py-1">수정</span>
       </div>
 
       {/* Profile card */}
       <div className="flex flex-col sm:flex-row gap-8 mb-10">
         <div className="flex flex-col items-center rounded-xl ring-1 ring-black/[0.08] px-10 py-8 shrink-0">
-          <div className="size-24 rounded-full bg-foreground flex items-center justify-center text-background text-3xl font-bold mb-4">김</div>
-          <p className="text-xl font-semibold">김건축</p>
-          <p className="text-sm text-muted-foreground mt-1">건축주</p>
+          <div className="size-24 rounded-full bg-foreground flex items-center justify-center text-background text-3xl font-bold mb-4">{(profile?.name ?? "?").charAt(0)}</div>
+          <p className="text-xl font-semibold">{profile?.name ?? "-"}</p>
+          <p className="text-sm text-muted-foreground mt-1">{roleLabel[profile?.role ?? ""] ?? "-"}</p>
+          {profile?.identity_verified && (
+            <div className="flex items-center gap-1.5 mt-3">
+              <ShieldCheck className="size-4 text-emerald-600" />
+              <span className="text-xs font-medium text-emerald-600">본인인증 완료</span>
+            </div>
+          )}
         </div>
         <div className="space-y-4">
           <div>
@@ -570,22 +614,45 @@ function PersonalContent() {
 
       <Separator className="mb-1" />
 
-      {[
-        { label: "이름", value: "김건축" },
-        { label: "이메일", value: "kim@example.com" },
-        { label: "휴대폰", value: "010-1234-5678" },
-        { label: "회원 유형", value: "건축주 개인" },
-        { label: "소셜 로그인", value: "연동 없음" },
-        { label: "가입일", value: "2025년 1월 15일" },
-      ].map((field) => (
-        <div key={field.label} className="flex items-center justify-between py-5 border-b border-border/30 last:border-b-0">
-          <div>
-            <p className="text-sm text-muted-foreground">{field.label}</p>
-            <p className="text-base mt-0.5">{field.value}</p>
+      {PERSONAL_FIELDS.map((field) => {
+        const label = editLabel(field.editType);
+        return (
+          <div key={field.label} className="flex items-center justify-between py-5 border-b border-border/30 last:border-b-0">
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-muted-foreground">{field.label}</p>
+                {field.editType === "identity" && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600">
+                    <ShieldCheck className="size-3" />
+                    본인인증 필요
+                  </span>
+                )}
+              </div>
+              <p className="text-base mt-0.5">
+                {field.label === "본인인증" ? (
+                  <span className="inline-flex items-center gap-1.5 text-emerald-600 font-medium">
+                    <CheckCircle className="size-4" />
+                    {field.value}
+                  </span>
+                ) : field.value}
+              </p>
+            </div>
+            {label && (
+              <button className="text-sm font-semibold underline underline-offset-4 text-foreground hover:text-muted-foreground transition-colors">
+                {label}
+              </button>
+            )}
           </div>
-          <button className="text-sm font-semibold underline underline-offset-4 text-foreground hover:text-muted-foreground transition-colors">수정</button>
-        </div>
-      ))}
+        );
+      })}
+
+      {/* Identity verification info */}
+      <div className="mt-6 rounded-xl bg-muted/50 p-5">
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          이름과 휴대폰 번호는 본인인증을 통해서만 변경할 수 있습니다.
+          이메일 변경 시에는 새 이메일로 인증 메일이 발송됩니다.
+        </p>
+      </div>
     </div>
   );
 }
@@ -598,10 +665,29 @@ function SecurityContent() {
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
+  const changePasswordMutation = useChangePassword();
 
   const pwValid = newPw.length >= 8 && /[a-zA-Z]/.test(newPw) && /[0-9]/.test(newPw) && /[^a-zA-Z0-9]/.test(newPw);
   const pwMatch = newPw === confirmPw && confirmPw.length > 0;
-  const canSubmit = currentPw.length > 0 && pwValid && pwMatch;
+  const canSubmit = currentPw.length > 0 && pwValid && pwMatch && !changePasswordMutation.isPending;
+
+  function handleChangePassword() {
+    changePasswordMutation.mutate(
+      { current_password: currentPw, new_password: newPw },
+      {
+        onSuccess: () => {
+          toast.success("비밀번호가 변경되었습니다");
+          setCurrentPw("");
+          setNewPw("");
+          setConfirmPw("");
+        },
+        onError: (error) => {
+          const msg = (error as any)?.response?.data?.error || "비밀번호 변경에 실패했습니다";
+          toast.error(msg);
+        },
+      },
+    );
+  }
 
   return (
     <div>
@@ -626,7 +712,9 @@ function SecurityContent() {
             <Input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="새 비밀번호 다시 입력" className="h-12 rounded-xl text-base" />
             {confirmPw.length > 0 && !pwMatch && <p className="text-sm text-destructive mt-2">비밀번호가 일치하지 않습니다</p>}
           </div>
-          <Button className="h-12 rounded-xl text-sm w-full" disabled={!canSubmit}>비밀번호 변경</Button>
+          <Button className="h-12 rounded-xl text-sm w-full" disabled={!canSubmit} onClick={handleChangePassword}>
+            {changePasswordMutation.isPending ? "변경 중..." : "비밀번호 변경"}
+          </Button>
         </div>
       </div>
 
@@ -653,6 +741,9 @@ function SecurityContent() {
    ═══════════════════════════════════════════════ */
 
 function NotificationsContent() {
+  const { data: settings } = useNotificationSettings();
+  const updateMutation = useUpdateNotificationSettings();
+
   const [emailBid, setEmailBid] = useState(true);
   const [emailProposal, setEmailProposal] = useState(true);
   const [emailContract, setEmailContract] = useState(false);
@@ -660,6 +751,23 @@ function NotificationsContent() {
   const [pushBid, setPushBid] = useState(true);
   const [pushProposal, setPushProposal] = useState(true);
   const [pushChat, setPushChat] = useState(true);
+
+  // Sync from server
+  useEffect(() => {
+    if (settings) {
+      setEmailBid(settings.bid_email);
+      setEmailProposal(settings.proposal_email);
+      setEmailContract(settings.contract_email);
+      setEmailMarketing(settings.marketing_email);
+      setPushBid(settings.bid_push);
+      setPushProposal(settings.proposal_push);
+      setPushChat(settings.chat_push);
+    }
+  }, [settings]);
+
+  function handleToggle(field: string, value: boolean) {
+    updateMutation.mutate({ [field]: value });
+  }
 
   function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
     return (
@@ -683,17 +791,17 @@ function NotificationsContent() {
       <h3 className="text-lg font-semibold mb-2">이메일 알림</h3>
       <Separator className="mb-1" />
       {[
-        { label: "입찰 현황 알림", desc: "입찰 공고의 상태 변경, 마감 임박 알림", checked: emailBid, onChange: setEmailBid },
-        { label: "제안서 알림", desc: "새 제안서 수신, 제안서 상태 변경 알림", checked: emailProposal, onChange: setEmailProposal },
-        { label: "계약 알림", desc: "계약 체결, 진행 상황 알림", checked: emailContract, onChange: setEmailContract },
-        { label: "마케팅 및 소식", desc: "신규 기능, 이벤트, 뉴스레터", checked: emailMarketing, onChange: setEmailMarketing },
+        { label: "입찰 현황 알림", desc: "입찰 공고의 상태 변경, 마감 임박 알림", checked: emailBid, field: "bid_email", onChange: setEmailBid },
+        { label: "제안서 알림", desc: "새 제안서 수신, 제안서 상태 변경 알림", checked: emailProposal, field: "proposal_email", onChange: setEmailProposal },
+        { label: "계약 알림", desc: "계약 체결, 진행 상황 알림", checked: emailContract, field: "contract_email", onChange: setEmailContract },
+        { label: "마케팅 및 소식", desc: "신규 기능, 이벤트, 뉴스레터", checked: emailMarketing, field: "marketing_email", onChange: setEmailMarketing },
       ].map((item) => (
         <div key={item.label} className="flex items-center justify-between py-5 border-b border-border/30 last:border-b-0">
           <div>
             <p className="text-base">{item.label}</p>
             <p className="text-sm text-muted-foreground mt-0.5">{item.desc}</p>
           </div>
-          <Toggle checked={item.checked} onChange={item.onChange} />
+          <Toggle checked={item.checked} onChange={(v) => { item.onChange(v); handleToggle(item.field, v); }} />
         </div>
       ))}
 
@@ -701,16 +809,16 @@ function NotificationsContent() {
       <h3 className="text-lg font-semibold mt-10 mb-2">푸시 알림</h3>
       <Separator className="mb-1" />
       {[
-        { label: "입찰 알림", desc: "새 참여자, 상태 변경 푸시 알림", checked: pushBid, onChange: setPushBid },
-        { label: "제안서 알림", desc: "새 제안서 수신 푸시 알림", checked: pushProposal, onChange: setPushProposal },
-        { label: "채팅 메시지", desc: "새 채팅 메시지 수신 푸시 알림", checked: pushChat, onChange: setPushChat },
+        { label: "입찰 알림", desc: "새 참여자, 상태 변경 푸시 알림", checked: pushBid, field: "bid_push", onChange: setPushBid },
+        { label: "제안서 알림", desc: "새 제안서 수신 푸시 알림", checked: pushProposal, field: "proposal_push", onChange: setPushProposal },
+        { label: "채팅 메시지", desc: "새 채팅 메시지 수신 푸시 알림", checked: pushChat, field: "chat_push", onChange: setPushChat },
       ].map((item) => (
         <div key={item.label} className="flex items-center justify-between py-5 border-b border-border/30 last:border-b-0">
           <div>
             <p className="text-base">{item.label}</p>
             <p className="text-sm text-muted-foreground mt-0.5">{item.desc}</p>
           </div>
-          <Toggle checked={item.checked} onChange={item.onChange} />
+          <Toggle checked={item.checked} onChange={(v) => { item.onChange(v); handleToggle(item.field, v); }} />
         </div>
       ))}
     </div>
@@ -787,6 +895,12 @@ function WithdrawContent() {
   const [agreed, setAgreed] = useState(false);
   const [reason, setReason] = useState("");
   const [customReason, setCustomReason] = useState("");
+  const [identityVerified, setIdentityVerified] = useState(false);
+
+  function handleIdentityVerify() {
+    // Mock: simulate identity verification
+    setTimeout(() => setIdentityVerified(true), 800);
+  }
 
   return (
     <div>
@@ -802,7 +916,7 @@ function WithdrawContent() {
               <li>· 작성한 공고, 제안, 프로젝트 등의 데이터는 복구할 수 없습니다.</li>
               <li>· 진행중인 계약이 있는 경우 탈퇴가 제한될 수 있습니다.</li>
               <li>· 법적 의무 보관 항목은 비식별 처리 후 보관됩니다.</li>
-              <li>· 동일 이메일로 재가입이 제한될 수 있습니다.</li>
+              <li>· 탈퇴 후 30일간 동일 본인인증 정보로 재가입이 제한됩니다.</li>
             </ul>
           </div>
         </div>
@@ -828,8 +942,74 @@ function WithdrawContent() {
         <span className="text-sm leading-relaxed">위 유의사항을 모두 확인하였으며, 회원 탈퇴에 동의합니다.</span>
       </label>
 
-      <Button variant="destructive" className="h-12 rounded-xl w-full sm:w-auto sm:px-12 text-sm" disabled={!agreed}>탈퇴하기</Button>
+      {/* Identity verification step */}
+      {agreed && !identityVerified && (
+        <div className="rounded-xl ring-1 ring-black/[0.08] p-6 mb-8">
+          <div className="flex items-start gap-4">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-red-50 shrink-0">
+              <ShieldCheck className="size-5 text-red-600" />
+            </div>
+            <div className="flex-1">
+              <h4 className="text-base font-semibold mb-1">본인인증 확인</h4>
+              <p className="text-sm text-muted-foreground mb-4">
+                회원 탈퇴를 위해 본인인증이 필요합니다
+              </p>
+              <Button
+                variant="outline"
+                className="h-10 rounded-xl text-sm"
+                onClick={handleIdentityVerify}
+              >
+                <ShieldCheck className="size-4 mr-2" />
+                본인인증 진행
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {agreed && identityVerified && (
+        <div className="rounded-xl ring-2 ring-emerald-500/20 bg-emerald-50 p-5 mb-8">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="size-5 text-emerald-600 shrink-0" />
+            <p className="text-sm font-semibold text-emerald-900">본인인증이 완료되었습니다</p>
+          </div>
+        </div>
+      )}
+
+      <WithdrawButton agreed={agreed} identityVerified={identityVerified} reason={reason === "기타" ? customReason : reason} />
     </div>
+  );
+}
+
+function WithdrawButton({ agreed, identityVerified, reason }: { agreed: boolean; identityVerified: boolean; reason: string }) {
+  const withdrawMutation = useWithdraw();
+
+  return (
+    <Button
+      variant="destructive"
+      className="h-12 rounded-xl w-full sm:w-auto sm:px-12 text-sm"
+      disabled={!agreed || !identityVerified || withdrawMutation.isPending}
+      onClick={() => {
+        withdrawMutation.mutate(
+          { reason: reason || "사유 없음" },
+          {
+            onSuccess: () => {
+              localStorage.removeItem("access_token");
+              localStorage.removeItem("refresh_token");
+              localStorage.removeItem("auth_user");
+              toast.success("회원 탈퇴가 완료되었습니다");
+              window.location.href = "/";
+            },
+            onError: (error) => {
+              const msg = (error as any)?.response?.data?.error || "탈퇴 처리에 실패했습니다";
+              toast.error(msg);
+            },
+          },
+        );
+      }}
+    >
+      {withdrawMutation.isPending ? "처리 중..." : "탈퇴하기"}
+    </Button>
   );
 }
 

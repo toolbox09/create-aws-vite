@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { useLogin } from "@/features/auth/api/queries";
+import { useAuthStore } from "@/lib/mock-auth";
 
 function NaverIcon({ className }: { className?: string }) {
   return (
@@ -26,11 +28,31 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const loginMutation = useLogin();
+  const { setUser } = useAuthStore();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    toast.success("로그인 성공", { description: "환영합니다, 김건축님!" });
-    setTimeout(() => navigate("/map"), 800);
+    loginMutation.mutate(
+      { email, password },
+      {
+        onSuccess: (data) => {
+          setUser(data.user);
+          toast.success("로그인 성공", { description: `환영합니다, ${data.user.name}님!` });
+          navigate("/map");
+        },
+        onError: (error) => {
+          const msg = (error as any)?.response?.data?.error || "로그인에 실패했습니다";
+          toast.error("로그인 실패", { description: msg });
+        },
+      },
+    );
+  }
+
+  function handleSocialLogin(provider: "naver" | "kakao") {
+    // Redirect to server OAuth endpoint — server handles the full OAuth flow
+    // and redirects back with tokens (existing user) or to signup (new user)
+    window.location.href = `/api/auth/oauth/${provider}`;
   }
 
   return (
@@ -49,6 +71,7 @@ export default function LoginPage() {
         <div className="space-y-2.5 animate-fade-up stagger-1">
           <button
             type="button"
+            onClick={() => handleSocialLogin("naver")}
             className="flex w-full items-center justify-center gap-2.5 rounded-xl px-4 py-3 text-sm font-medium transition-colors bg-[#03C75A] text-white hover:bg-[#02b351]"
           >
             <NaverIcon className="size-4" />
@@ -56,6 +79,7 @@ export default function LoginPage() {
           </button>
           <button
             type="button"
+            onClick={() => handleSocialLogin("kakao")}
             className="flex w-full items-center justify-center gap-2.5 rounded-xl px-4 py-3 text-sm font-medium transition-colors bg-[#FEE500] text-[#191919] hover:bg-[#F5DC00]"
           >
             <KakaoIcon className="size-4" />
@@ -86,12 +110,12 @@ export default function LoginPage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="password">비밀번호</Label>
-              <a
-                href="/auth/password-reset"
+              <Link
+                to="/auth/password-find"
                 className="text-xs text-muted-foreground hover:text-primary transition-colors"
               >
                 비밀번호 찾기
-              </a>
+              </Link>
             </div>
             <Input
               id="password"
@@ -104,8 +128,8 @@ export default function LoginPage() {
             />
           </div>
 
-          <Button type="submit" className="w-full h-11 rounded-xl">
-            로그인
+          <Button type="submit" className="w-full h-11 rounded-xl" disabled={loginMutation.isPending}>
+            {loginMutation.isPending ? "로그인 중..." : "로그인"}
           </Button>
         </form>
 
