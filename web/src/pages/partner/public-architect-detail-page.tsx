@@ -1,310 +1,540 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2, Building2, CalendarDays, Award, MapPin, TrendingUp } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import SiteHeader from "@/components/layout/site-header";
+import {
+  useArchitectBaseByRegNumQuery,
+  useArchitectMainQuery,
+  useArchitectTypeQuery,
+  useArchitectCnstrQuery,
+} from "@/features/architect/api/queries";
+import {
+  PmtBldgDsgnUseCdCntLabel,
+  PmtBldgDsgnCnstrCdCntLabel,
+} from "@conmarket/apis";
+import type {
+  BuildingDesignerBaseDTO,
+  BuildingDesignerMainDTO,
+  BuildingDesignerTypeDTO,
+  BuildingDesignerConstructionTypeDTO,
+} from "@conmarket/apis";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
-/* ─── Mock Data ─── */
+/* ─── Colors ─── */
 
-const ARCHITECT = {
-  id: 1,
-  firmName: "아크 건축사사무소",
-  region: "서울",
-  yearsInBusiness: 12,
-  totalPermits: 87,
-};
-
-const USAGE_DISTRIBUTION = [
-  { label: "근린생활시설", percentage: 40, color: "bg-blue-500" },
-  { label: "단독주택", percentage: 25, color: "bg-emerald-500" },
-  { label: "다세대주택", percentage: 15, color: "bg-amber-500" },
-  { label: "공동주택", percentage: 10, color: "bg-violet-500" },
-  { label: "기타", percentage: 10, color: "bg-gray-400" },
+const USAGE_COLORS = [
+  "#6366f1", "#10b981", "#f59e0b", "#8b5cf6",
+  "#f43f5e", "#06b6d4", "#ec4899", "#94a3b8",
 ];
 
-const YEARLY_PERMITS = [
-  { year: 2016, count: 5 },
-  { year: 2017, count: 8 },
-  { year: 2018, count: 7 },
-  { year: 2019, count: 12 },
-  { year: 2020, count: 9 },
-  { year: 2021, count: 11 },
-  { year: 2022, count: 14 },
-  { year: 2023, count: 10 },
-  { year: 2024, count: 8 },
-  { year: 2025, count: 3 },
+const CNSTR_COLORS = [
+  "#6366f1", "#10b981", "#f59e0b", "#8b5cf6",
+  "#f43f5e", "#06b6d4", "#94a3b8",
 ];
 
-const DESIGN_TYPES = [
-  { label: "신축", color: "bg-blue-500" },
-  { label: "증축", color: "bg-emerald-500" },
-  { label: "용도변경", color: "bg-amber-500" },
-  { label: "대수선", color: "bg-violet-500" },
-  { label: "개축", color: "bg-rose-500" },
-  { label: "재축", color: "bg-cyan-500" },
-  { label: "이전", color: "bg-gray-400" },
-];
+/* ─── Key lists ─── */
 
-const YEARLY_DESIGN_DISTRIBUTION = [
-  { year: 2016, values: [3, 1, 0, 1, 0, 0, 0] },
-  { year: 2017, values: [4, 2, 1, 0, 1, 0, 0] },
-  { year: 2018, values: [3, 1, 1, 1, 0, 1, 0] },
-  { year: 2019, values: [6, 2, 1, 1, 1, 0, 1] },
-  { year: 2020, values: [4, 2, 1, 1, 0, 0, 1] },
-  { year: 2021, values: [5, 3, 1, 1, 0, 1, 0] },
-  { year: 2022, values: [7, 3, 2, 1, 0, 0, 1] },
-  { year: 2023, values: [5, 2, 1, 1, 0, 1, 0] },
-  { year: 2024, values: [4, 1, 1, 1, 1, 0, 0] },
-  { year: 2025, values: [2, 0, 0, 1, 0, 0, 0] },
-];
+type UsageCntKey = keyof typeof PmtBldgDsgnUseCdCntLabel;
+type CnstrCntKey = keyof typeof PmtBldgDsgnCnstrCdCntLabel;
 
-/* ─── Page ─── */
+const usageKeys = Object.keys(PmtBldgDsgnUseCdCntLabel).filter(
+  (k) => k !== "main_use_cd_00_cnt",
+) as UsageCntKey[];
+
+const cnstrKeys = Object.keys(PmtBldgDsgnCnstrCdCntLabel).filter(
+  (k) => k !== "main_construction_cd_00_cnt",
+) as CnstrCntKey[];
+
+/* ─── Helpers ─── */
+
+function parseLawdEntries(lawd: string) {
+  if (!lawd) return [];
+  return lawd.split(",").map((entry) => {
+    const [name, cnt] = entry.split("/");
+    return { name: name?.trim() ?? "-", count: Number(cnt) || 0 };
+  });
+}
+
+function derivePrimaryUsage(dto: BuildingDesignerMainDTO): string {
+  let maxKey = usageKeys[0];
+  let maxVal = 0;
+  for (const key of usageKeys) {
+    const val = Number(dto[key]) || 0;
+    if (val > maxVal) { maxVal = val; maxKey = key; }
+  }
+  return PmtBldgDsgnUseCdCntLabel[maxKey];
+}
+
+function parseUsageDistribution(dto: BuildingDesignerMainDTO) {
+  const total = Number(dto.main_use_cd_00_cnt) || 1;
+  return usageKeys
+    .map((key, idx) => ({
+      name: PmtBldgDsgnUseCdCntLabel[key],
+      value: Number(dto[key]) || 0,
+      percentage: Math.round(((Number(dto[key]) || 0) / total) * 100),
+      color: USAGE_COLORS[idx],
+    }))
+    .filter((d) => d.value > 0);
+}
+
+function parseTypeByYear(rows: BuildingDesignerTypeDTO[]) {
+  return [...rows]
+    .sort((a, b) => Number(a.yyyy) - Number(b.yyyy))
+    .map((row) => {
+      const result: Record<string, string | number> = { year: row.yyyy };
+      usageKeys.forEach((key) => {
+        result[PmtBldgDsgnUseCdCntLabel[key]] = Number(row[key as keyof BuildingDesignerTypeDTO] as string) || 0;
+      });
+      return result;
+    });
+}
+
+function parseCnstrByYear(rows: BuildingDesignerConstructionTypeDTO[]) {
+  return [...rows]
+    .sort((a, b) => Number(a.yyyy) - Number(b.yyyy))
+    .map((row) => {
+      const result: Record<string, string | number> = { year: row.yyyy };
+      cnstrKeys.forEach((key) => {
+        result[PmtBldgDsgnCnstrCdCntLabel[key]] = Number(row[key]) || 0;
+      });
+      return result;
+    });
+}
+
+function parseYearlyTotals(rows: BuildingDesignerConstructionTypeDTO[]) {
+  return [...rows]
+    .sort((a, b) => Number(a.yyyy) - Number(b.yyyy))
+    .map((row) => ({
+      year: row.yyyy,
+      count: Number(row.main_construction_cd_00_cnt) || 0,
+    }));
+}
+
+function parseBaseUsageSummary(dto: BuildingDesignerBaseDTO) {
+  const total = Number(dto.main_use_cd_00_cnt) || 1;
+  return usageKeys
+    .map((key, idx) => ({
+      label: PmtBldgDsgnUseCdCntLabel[key],
+      count: Number(dto[key as keyof BuildingDesignerBaseDTO] as string) || 0,
+      percentage: Math.round(((Number(dto[key as keyof BuildingDesignerBaseDTO] as string) || 0) / total) * 100),
+      color: USAGE_COLORS[idx],
+    }))
+    .filter((d) => d.count > 0);
+}
+
+/* ─── Stat Card ─── */
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  icon: typeof Building2;
+  label: string;
+  value: string;
+  sub?: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl bg-muted/40 p-4">
+      <div className={`flex size-9 items-center justify-center rounded-lg ${accent ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+        <Icon className="size-4.5" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[11px] text-muted-foreground leading-none mb-1">{label}</p>
+        <p className={`text-sm font-semibold leading-tight ${accent ? "text-primary" : ""}`}>{value}</p>
+        {sub && <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Chart Card Wrapper ─── */
+
+function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-card rounded-2xl ring-1 ring-black/[0.06] shadow-sm p-5">
+      <h2 className="text-[13px] font-semibold tracking-tight text-muted-foreground uppercase mb-4">
+        {title}
+      </h2>
+      {children}
+    </div>
+  );
+}
+
+/* ─── Custom Tooltip ─── */
+
+function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-lg bg-popover/95 backdrop-blur border shadow-lg p-3 text-xs">
+      <p className="font-semibold mb-1.5">{label}</p>
+      {payload.map((p) => (
+        <div key={p.name} className="flex items-center gap-2 py-0.5">
+          <span className="size-2 rounded-full" style={{ backgroundColor: p.color }} />
+          <span className="text-muted-foreground">{p.name}</span>
+          <span className="ml-auto font-medium tabular-nums">{p.value.toLocaleString()}건</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Donut Center Label ─── */
+
+function DonutCenterLabel({ viewBox, total }: { viewBox?: { cx: number; cy: number }; total: number }) {
+  if (!viewBox) return null;
+  const { cx, cy } = viewBox;
+  return (
+    <>
+      <text x={cx} y={cy - 6} textAnchor="middle" className="fill-muted-foreground text-[11px]">총</text>
+      <text x={cx} y={cy + 14} textAnchor="middle" className="fill-foreground text-[16px] font-bold">{total.toLocaleString()}건</text>
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   Page
+   ═══════════════════════════════════════════ */
 
 export default function PublicArchitectDetailPage() {
-  const { id } = useParams();
-  void id;
+  const { id } = useParams<{ id: string }>();
+  const regNum = id ?? "";
 
-  const maxCount = Math.max(...YEARLY_PERMITS.map((y) => y.count));
-  const totalPermits = USAGE_DISTRIBUTION.reduce((s, d) => s + d.percentage, 0);
+  const { data: baseData, isPending: basePending } = useArchitectBaseByRegNumQuery(regNum);
+  const { data: mainData, isPending: mainPending } = useArchitectMainQuery(regNum);
+  const { data: typeData, isPending: typePending } = useArchitectTypeQuery(regNum);
+  const { data: cnstrData, isPending: cnstrPending } = useArchitectCnstrQuery(regNum);
+
+  const architect = baseData?.body?.[0];
+  const mainDto = mainData?.body?.[0];
+  const typeRows = typeData?.body ?? [];
+  const cnstrRows = cnstrData?.body ?? [];
+
+  const usageDist = mainDto ? parseUsageDistribution(mainDto) : [];
+  const primaryUsage = mainDto ? derivePrimaryUsage(mainDto) : "-";
+  const typeByYear = parseTypeByYear(typeRows);
+  const cnstrByYear = parseCnstrByYear(cnstrRows);
+  const yearlyTotals = parseYearlyTotals(cnstrRows);
+
+  const totalPermits = Number(architect?.main_use_cd_00_cnt ?? 0);
+
+  const lv1Regions = architect ? parseLawdEntries(architect.lv1_lawd) : [];
+  const lv2Regions = architect ? parseLawdEntries(architect.lv2_lawd) : [];
+  const baseUsageSummary = architect ? parseBaseUsageSummary(architect) : [];
+
+  const isLoading = basePending || mainPending || typePending || cnstrPending;
+
+  // active usage labels for stacked bar
+  const activeUsageLabels = usageKeys.map((k) => PmtBldgDsgnUseCdCntLabel[k]);
+  const activeCnstrLabels = cnstrKeys.map((k) => PmtBldgDsgnCnstrCdCntLabel[k]);
 
   return (
     <div className="min-h-svh bg-background">
       <SiteHeader />
 
       <div className="mx-auto max-w-[1120px] px-6 py-8">
-        {/* ═══ Back Link ═══ */}
+        {/* Back */}
         <Link
-          to="/architects"
+          to="/partners?view=permits"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
         >
           <ArrowLeft className="size-4" />
           목록으로
         </Link>
 
-        {/* ═══ Company Info Card ═══ */}
-        <div className="bg-card rounded-2xl ring-1 ring-black/[0.08] shadow-sm p-6 mb-8">
-          <h1 className="text-2xl font-bold tracking-tight mb-4">
-            {ARCHITECT.firmName}
-          </h1>
-          <Separator className="mb-4" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">건축사무소명</p>
-              <p className="text-sm font-medium">{ARCHITECT.firmName}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">주 인허가 지역</p>
-              <p className="text-sm font-medium">{ARCHITECT.region}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">업력</p>
-              <p className="text-sm font-medium">{ARCHITECT.yearsInBusiness}년</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">총 인허가 수</p>
-              <p className="text-lg font-bold text-primary">{ARCHITECT.totalPermits}건</p>
-            </div>
+        {isLoading && (
+          <div className="flex items-center justify-center py-32">
+            <Loader2 className="size-8 animate-spin text-muted-foreground" />
           </div>
-        </div>
+        )}
 
-        {/* ═══ Chart Sections ═══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* ── Donut Chart: 건축 용도별 인허가 분포 ── */}
-          <div className="bg-card rounded-2xl ring-1 ring-black/[0.08] shadow-sm p-6">
-            <h2 className="text-base font-semibold tracking-tight mb-5">
-              건축 용도별 인허가 분포
-            </h2>
+        {!isLoading && !architect && (
+          <div className="py-32 text-center text-sm text-muted-foreground">
+            건축사 정보를 찾을 수 없습니다
+          </div>
+        )}
 
-            {USAGE_DISTRIBUTION.length > 0 ? (
-              <div className="flex gap-6">
-                {/* Donut visualization */}
-                <div className="relative shrink-0">
-                  <svg viewBox="0 0 120 120" className="size-[140px]">
-                    {(() => {
-                      let cumulative = 0;
-                      return USAGE_DISTRIBUTION.map((item, idx) => {
-                        const radius = 45;
-                        const circumference = 2 * Math.PI * radius;
-                        const strokeLen = (item.percentage / totalPermits) * circumference;
-                        const offset = -(cumulative / totalPermits) * circumference;
-                        cumulative += item.percentage;
+        {!isLoading && architect && (
+          <>
+            {/* ═══ Header ═══ */}
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold tracking-tight mb-1">
+                {architect.building_designer_nm}
+              </h1>
+              <p className="text-sm text-muted-foreground font-mono">
+                {architect.building_designer_reg_num}
+              </p>
+            </div>
 
-                        const colorMap: Record<string, string> = {
-                          "bg-blue-500": "#3b82f6",
-                          "bg-emerald-500": "#10b981",
-                          "bg-amber-500": "#f59e0b",
-                          "bg-violet-500": "#8b5cf6",
-                          "bg-gray-400": "#9ca3af",
-                        };
+            {/* ═══ Stat Grid ═══ */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+              <StatCard
+                icon={TrendingUp}
+                label="총 인허가 수"
+                value={`${totalPermits.toLocaleString()}건`}
+                accent
+              />
+              <StatCard
+                icon={Building2}
+                label="주 건축용도"
+                value={primaryUsage}
+              />
+              <StatCard
+                icon={MapPin}
+                label="주 인허가 지역"
+                value={lv1Regions[0]?.name ?? "-"}
+                sub={lv1Regions.length > 1 ? `외 ${lv1Regions.length - 1}개 지역` : undefined}
+              />
+              <StatCard
+                icon={CalendarDays}
+                label="업력"
+                value={`${architect.work_diff}년`}
+                sub={`최초 허가 ${architect.init_permission_dt}`}
+              />
+            </div>
 
-                        return (
-                          <circle
-                            key={idx}
-                            cx="60"
-                            cy="60"
-                            r={radius}
-                            fill="none"
-                            stroke={colorMap[item.color] ?? "#9ca3af"}
-                            strokeWidth="16"
-                            strokeDasharray={`${strokeLen} ${circumference - strokeLen}`}
-                            strokeDashoffset={offset}
-                            transform="rotate(-90 60 60)"
-                          />
-                        );
-                      });
-                    })()}
-                    <text
-                      x="60"
-                      y="56"
-                      textAnchor="middle"
-                      className="fill-foreground text-[11px] font-semibold"
-                    >
-                      총
-                    </text>
-                    <text
-                      x="60"
-                      y="72"
-                      textAnchor="middle"
-                      className="fill-foreground text-[15px] font-bold"
-                    >
-                      {ARCHITECT.totalPermits}건
-                    </text>
-                  </svg>
-                </div>
+            {/* ═══ Score + Regions ═══ */}
+            <div className="bg-card rounded-2xl ring-1 ring-black/[0.06] shadow-sm p-5 mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Award className="size-4 text-muted-foreground" />
+                <span className="text-sm font-medium">자체점수</span>
+                <span className="text-sm font-bold text-primary ml-1">
+                  {Number(architect.total_score).toLocaleString()}점
+                </span>
+              </div>
 
-                {/* Legend list with proportional bars */}
-                <div className="flex-1 space-y-2.5">
-                  {USAGE_DISTRIBUTION.map((item) => (
-                    <div key={item.label}>
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="flex items-center gap-2">
-                          <span className={`size-2.5 rounded-full ${item.color}`} />
-                          <span>{item.label}</span>
-                        </span>
-                        <span className="font-medium tabular-nums">{item.percentage}%</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${item.color}`}
-                          style={{ width: `${item.percentage}%` }}
+              <Separator className="mb-4" />
+
+              {/* lv1 */}
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                시/도별 활동지역
+              </p>
+              <div className="flex flex-wrap gap-1.5 mb-4">
+                {lv1Regions.map((r) => (
+                  <Badge key={r.name} variant="secondary" className="text-xs rounded-lg font-normal">
+                    {r.name} <span className="text-muted-foreground ml-1">{r.count}</span>
+                  </Badge>
+                ))}
+              </div>
+
+              {/* lv2 */}
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                시/군/구별 활동지역
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {lv2Regions.slice(0, 12).map((r) => (
+                  <Badge key={r.name} variant="outline" className="text-xs rounded-lg font-normal">
+                    {r.name} <span className="text-muted-foreground ml-1">{r.count}</span>
+                  </Badge>
+                ))}
+                {lv2Regions.length > 12 && (
+                  <Badge variant="outline" className="text-xs rounded-lg font-normal text-muted-foreground">
+                    +{lv2Regions.length - 12}개
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {/* ═══ Row 1: Donut + Yearly Trend ═══ */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              {/* Donut */}
+              <ChartCard title="건축 용도별 인허가 분포">
+                {usageDist.length > 0 ? (
+                  <div className="flex flex-col items-center gap-4">
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie
+                          data={usageDist}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={90}
+                          dataKey="value"
+                          strokeWidth={2}
+                          stroke="var(--color-card)"
+                        >
+                          {usageDist.map((entry, idx) => (
+                            <Cell key={idx} fill={entry.color} />
+                          ))}
+                          <Pie data={[]} dataKey="value" label={<DonutCenterLabel total={totalPermits} />} />
+                        </Pie>
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.[0]) return null;
+                            const d = payload[0].payload as typeof usageDist[0];
+                            return (
+                              <div className="rounded-lg bg-popover/95 backdrop-blur border shadow-lg p-3 text-xs">
+                                <span className="font-semibold">{d.name}</span>
+                                <span className="ml-2 tabular-nums">{d.value.toLocaleString()}건 ({d.percentage}%)</span>
+                              </div>
+                            );
+                          }}
                         />
-                      </div>
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5">
+                      {usageDist.map((d) => (
+                        <span key={d.name} className="inline-flex items-center gap-1.5 text-xs">
+                          <span className="size-2 rounded-full" style={{ backgroundColor: d.color }} />
+                          {d.name}
+                          <span className="text-muted-foreground tabular-nums">{d.percentage}%</span>
+                        </span>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="py-16 text-center text-sm text-muted-foreground">
-                데이터가 없습니다
-              </div>
-            )}
-          </div>
+                  </div>
+                ) : (
+                  <div className="h-[220px] flex items-center justify-center text-sm text-muted-foreground">데이터가 없습니다</div>
+                )}
+              </ChartCard>
 
-          {/* ── Bar Chart: 연도별 인허가 추이 ── */}
-          <div className="bg-card rounded-2xl ring-1 ring-black/[0.08] shadow-sm p-6">
-            <h2 className="text-base font-semibold tracking-tight mb-5">
-              연도별 인허가 추이
-            </h2>
+              {/* Yearly Trend */}
+              <ChartCard title="연도별 인허가 추이">
+                {yearlyTotals.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={yearlyTotals} margin={{ top: 5, right: 5, bottom: 5, left: -10 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+                      <XAxis
+                        dataKey="year"
+                        tick={{ fontSize: 11 }}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v: string) => `'${v.slice(2)}`}
+                      />
+                      <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={35} />
+                      <Tooltip content={<ChartTooltip />} />
+                      <Bar dataKey="count" name="인허가" fill="#6366f1" radius={[3, 3, 0, 0]} maxBarSize={28} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[280px] flex items-center justify-center text-sm text-muted-foreground">데이터가 없습니다</div>
+                )}
+              </ChartCard>
+            </div>
 
-            {YEARLY_PERMITS.length > 0 ? (
-              <div className="flex items-end gap-2 h-[180px]">
-                {YEARLY_PERMITS.map((y) => (
+            {/* ═══ Row 2: Usage Summary Grid ═══ */}
+            <ChartCard title="용도별 인허가 요약">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-8 gap-2">
+                {baseUsageSummary.map((item) => (
                   <div
-                    key={y.year}
-                    className="flex-1 flex flex-col items-center justify-end h-full"
+                    key={item.label}
+                    className="rounded-lg border p-2.5 text-center hover:bg-muted/30 transition-colors"
                   >
-                    <span className="text-[11px] font-medium tabular-nums mb-1">
-                      {y.count}
-                    </span>
-                    <div
-                      className="w-full rounded-t-md bg-primary/80 min-h-[4px] transition-all"
-                      style={{
-                        height: `${(y.count / maxCount) * 140}px`,
-                      }}
-                    />
-                    <span className="text-[10px] text-muted-foreground mt-2 tabular-nums">
-                      {String(y.year).slice(2)}
-                    </span>
+                    <div className="size-2 rounded-full mx-auto mb-1.5" style={{ backgroundColor: item.color }} />
+                    <p className="text-[11px] text-muted-foreground leading-tight mb-1">{item.label}</p>
+                    <p className="text-sm font-bold tabular-nums">{item.count.toLocaleString()}</p>
+                    <p className="text-[10px] text-muted-foreground tabular-nums">{item.percentage}%</p>
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="py-16 text-center text-sm text-muted-foreground">
-                데이터가 없습니다
-              </div>
-            )}
-          </div>
-        </div>
+            </ChartCard>
 
-        {/* ── Stacked Horizontal Bars: 연도별 설계 종류 분포 ── */}
-        <div className="bg-card rounded-2xl ring-1 ring-black/[0.08] shadow-sm p-6">
-          <h2 className="text-base font-semibold tracking-tight mb-5">
-            연도별 설계 종류 분포
-          </h2>
-
-          {YEARLY_DESIGN_DISTRIBUTION.length > 0 ? (
-            <>
-              {/* Legend */}
-              <div className="flex flex-wrap gap-3 mb-5">
-                {DESIGN_TYPES.map((dt) => (
-                  <span key={dt.label} className="flex items-center gap-1.5 text-xs">
-                    <span className={`size-2.5 rounded-full ${dt.color}`} />
-                    {dt.label}
-                  </span>
-                ))}
-              </div>
-
-              {/* Bars */}
-              <div className="space-y-2.5">
-                {YEARLY_DESIGN_DISTRIBUTION.map((row) => {
-                  const total = row.values.reduce((s, v) => s + v, 0);
-                  return (
-                    <div key={row.year} className="flex items-center gap-3">
-                      <span className="text-xs text-muted-foreground tabular-nums w-10 shrink-0 text-right">
-                        {row.year}
-                      </span>
-                      <div className="flex-1 flex h-6 rounded-md overflow-hidden bg-muted">
-                        {row.values.map((val, idx) => {
-                          if (val === 0) return null;
-                          const colorMap: Record<string, string> = {
-                            "bg-blue-500": "#3b82f6",
-                            "bg-emerald-500": "#10b981",
-                            "bg-amber-500": "#f59e0b",
-                            "bg-violet-500": "#8b5cf6",
-                            "bg-rose-500": "#f43f5e",
-                            "bg-cyan-500": "#06b6d4",
-                            "bg-gray-400": "#9ca3af",
-                          };
-                          return (
-                            <div
-                              key={idx}
-                              className="h-full transition-all"
-                              style={{
-                                width: `${(val / total) * 100}%`,
-                                backgroundColor:
-                                  colorMap[DESIGN_TYPES[idx].color] ?? "#9ca3af",
-                              }}
-                              title={`${DESIGN_TYPES[idx].label}: ${val}건`}
-                            />
-                          );
-                        })}
-                      </div>
-                      <span className="text-xs font-medium tabular-nums w-8 shrink-0">
-                        {total}건
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <div className="py-16 text-center text-sm text-muted-foreground">
-              데이터가 없습니다
+            {/* ═══ Row 3: Yearly Usage Stacked Bar ═══ */}
+            <div className="mt-6">
+              <ChartCard title="연도별 건축 용도 분포">
+                {typeByYear.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={Math.max(320, typeByYear.length * 24 + 60)}>
+                    <BarChart
+                      data={typeByYear}
+                      layout="vertical"
+                      margin={{ top: 5, right: 30, bottom: 5, left: 10 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
+                      <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                      <YAxis
+                        dataKey="year"
+                        type="category"
+                        tick={{ fontSize: 11 }}
+                        tickLine={false}
+                        axisLine={false}
+                        width={40}
+                        tickFormatter={(v: string) => `'${v.slice(2)}`}
+                      />
+                      <Tooltip content={<ChartTooltip />} />
+                      <Legend
+                        iconType="circle"
+                        iconSize={8}
+                        wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                      />
+                      {activeUsageLabels.map((label, idx) => (
+                        <Bar
+                          key={label}
+                          dataKey={label}
+                          stackId="usage"
+                          fill={USAGE_COLORS[idx]}
+                          radius={idx === activeUsageLabels.length - 1 ? [0, 3, 3, 0] : undefined}
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[320px] flex items-center justify-center text-sm text-muted-foreground">데이터가 없습니다</div>
+                )}
+              </ChartCard>
             </div>
-          )}
-        </div>
 
-        {/* Bottom spacing */}
-        <div className="h-16" />
+            {/* ═══ Row 4: Yearly Construction Type Stacked Bar ═══ */}
+            <div className="mt-6">
+              <ChartCard title="연도별 설계 종류 분포">
+                {cnstrByYear.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={Math.max(320, cnstrByYear.length * 24 + 60)}>
+                    <BarChart
+                      data={cnstrByYear}
+                      layout="vertical"
+                      margin={{ top: 5, right: 30, bottom: 5, left: 10 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--color-border)" />
+                      <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                      <YAxis
+                        dataKey="year"
+                        type="category"
+                        tick={{ fontSize: 11 }}
+                        tickLine={false}
+                        axisLine={false}
+                        width={40}
+                        tickFormatter={(v: string) => `'${v.slice(2)}`}
+                      />
+                      <Tooltip content={<ChartTooltip />} />
+                      <Legend
+                        iconType="circle"
+                        iconSize={8}
+                        wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                      />
+                      {activeCnstrLabels.map((label, idx) => (
+                        <Bar
+                          key={label}
+                          dataKey={label}
+                          stackId="cnstr"
+                          fill={CNSTR_COLORS[idx]}
+                          radius={idx === activeCnstrLabels.length - 1 ? [0, 3, 3, 0] : undefined}
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[320px] flex items-center justify-center text-sm text-muted-foreground">데이터가 없습니다</div>
+                )}
+              </ChartCard>
+            </div>
+
+            <div className="h-16" />
+          </>
+        )}
       </div>
     </div>
   );

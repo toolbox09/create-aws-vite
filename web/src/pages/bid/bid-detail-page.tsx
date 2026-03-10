@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Heart,
@@ -29,6 +29,17 @@ import {
   Target,
   Home,
   CalendarDays,
+  HardHat,
+  Hammer,
+  Wrench,
+  Paintbrush,
+  Zap,
+  Eye,
+  ClipboardCheck,
+  FileBarChart,
+  UserCheck,
+  Calendar,
+  Timer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -59,16 +70,17 @@ interface Certification {
   detail?: string;
 }
 
-/* ─── Mock Data ─── */
+/* ─── Mock Data per Category ─── */
 
 const CURRENT_ROLE: UserRole = "owner";
 
-const BID = {
+/* 설계 */
+const BID_DESIGN = {
   id: 1,
   status: "입찰공고중" as BidStatus,
   field: "설계" as BidField,
   bidType: "공개" as const,
-  designScope: "본설계",
+  subScope: "본설계",
   address: "서울특별시 강남구 역삼동 123-4",
   title: "서울특별시 강남구 역삼동 신축 단독주택",
   buildingUse: "단독주택",
@@ -78,13 +90,13 @@ const BID = {
   floors: { above: 3, below: 1 },
   parking: { type: "자주식", count: 2 },
   totalBuildCost: 80000,
-  designFeeMin: 3000,
-  designFeeMax: 5000,
+  feeMin: 3000,
+  feeMax: 5000,
+  feeLabel: "설계비",
   recruitStart: "2026.02.20",
   recruitEnd: "2026.03.18",
   dDay: 9,
   currentStage: 1,
-  // 설계 분야 전용
   deliverables: ["기본설계도서", "실시설계도서", "구조계산서", "투시도", "3D 모델링"],
   styles: ["모던", "미니멀"],
   designElements: ["테라스", "중정", "루프탑"],
@@ -97,9 +109,9 @@ const BID = {
     "https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=600&h=400&fit=crop",
   ],
   certs: [
-    { label: "토지 소유", verified: true, type: "등기부등본", detail: undefined },
-    { label: "건축 가능 여부", verified: true, type: "건축사 확인서", detail: undefined },
-    { label: "건축허가", verified: false, type: undefined, detail: undefined },
+    { label: "토지 소유", verified: true, type: "등기부등본" },
+    { label: "건축 가능 여부", verified: true, type: "건축사 확인서" },
+    { label: "건축허가", verified: false },
   ] as Certification[],
   landInfo: {
     mainParcel: "서울특별시 강남구 역삼동 123-4",
@@ -111,6 +123,126 @@ const BID = {
     intro: "강남 역삼동에 가족을 위한 모던 단독주택을 짓고자 합니다. 자연과 조화를 이루는 따뜻한 공간을 원합니다.",
     joinDate: "2025년 12월",
   },
+  // 설계 전용
+  construction: null,
+  supervision: null,
+};
+
+/* 시공 */
+const BID_CONSTRUCTION = {
+  ...BID_DESIGN,
+  id: 2,
+  field: "시공" as BidField,
+  subScope: "신축",
+  title: "서울특별시 마포구 상수동 근린생활시설 신축공사",
+  address: "서울특별시 마포구 상수동 33-2",
+  buildingUse: "근린생활",
+  businessUse: "상업",
+  landArea: 330,
+  buildingArea: 264,
+  floors: { above: 5, below: 1 },
+  parking: { type: "기계식", count: 8 },
+  totalBuildCost: 250000,
+  feeMin: 200000,
+  feeMax: 280000,
+  feeLabel: "공사비",
+  referenceImages: [
+    "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1200&h=800&fit=crop",
+    "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=600&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=600&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1429497419816-9ca5cfb4571a?w=600&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600&h=400&fit=crop",
+  ],
+  certs: [
+    { label: "토지 소유", verified: true, type: "등기부등본" },
+    { label: "건축허가", verified: true, type: "건축허가증" },
+    { label: "설계도서 확보", verified: true, type: "실시설계도서" },
+  ] as Certification[],
+  poster: {
+    name: "박도급",
+    profileImage: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&h=120&fit=crop&crop=face",
+    intro: "마포구 상수동에 5층 규모 근린생활시설을 신축하고자 합니다. 품질 좋은 시공사를 찾고 있습니다.",
+    joinDate: "2025년 11월",
+  },
+  deliverables: [] as string[],
+  styles: [] as string[],
+  designElements: [] as string[],
+  exteriors: [] as string[],
+  construction: {
+    structureType: "철근콘크리트 (RC)",
+    constructionMethods: ["현장타설", "PC공법"],
+    majorMaterials: ["레미콘 (25-24-15)", "고강도 철근 (SD500)", "단열재 (비드법 2종)", "알루미늄 커튼월"],
+    interiorScopes: ["천장마감", "바닥마감", "벽체마감", "조명설치"],
+    mepScopes: ["전기설비", "급배수설비", "소방설비", "냉난방 (EHP)", "환기설비"],
+    desiredDuration: 18,
+    hasDesignDocs: true,
+    specialRequirements: "LEED 인증 목표, 소음·진동 최소화 공법 적용 희망",
+  },
+  supervision: null,
+};
+
+/* 감리 */
+const BID_SUPERVISION = {
+  ...BID_DESIGN,
+  id: 3,
+  field: "감리" as BidField,
+  subScope: "상주감리",
+  title: "인천 연수구 송도동 다세대주택 건축감리",
+  address: "인천광역시 연수구 송도동 100-5",
+  buildingUse: "다세대주택",
+  businessUse: "임대",
+  landArea: 450,
+  buildingArea: 360,
+  floors: { above: 7, below: 2 },
+  parking: { type: "자주식", count: 20 },
+  totalBuildCost: 350000,
+  feeMin: 8000,
+  feeMax: 12000,
+  feeLabel: "감리비",
+  referenceImages: [
+    "https://images.unsplash.com/photo-1590650153855-d9e808231d41?w=1200&h=800&fit=crop",
+    "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=600&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1581092921461-eab62e97a780?w=600&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1593642634315-48f5414c3ad9?w=600&h=400&fit=crop",
+    "https://images.unsplash.com/photo-1513467535987-fd81bc7d600f?w=600&h=400&fit=crop",
+  ],
+  certs: [
+    { label: "토지 소유", verified: true, type: "등기부등본" },
+    { label: "건축허가", verified: true, type: "건축허가증" },
+    { label: "설계도서 확보", verified: true, type: "실시설계도서" },
+    { label: "시공계약 확보", verified: false },
+  ] as Certification[],
+  poster: {
+    name: "이위탁",
+    profileImage: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop&crop=face",
+    intro: "송도동 7층 다세대주택 공사 감리를 맡길 경험 있는 감리업체를 찾습니다. 상주감리 우대합니다.",
+    joinDate: "2026년 1월",
+  },
+  deliverables: [] as string[],
+  styles: [] as string[],
+  designElements: [] as string[],
+  exteriors: [] as string[],
+  construction: null,
+  supervision: {
+    supervisionType: "상주감리",
+    supervisionScopes: ["구조감리", "건축감리", "기계설비감리", "전기감리", "소방감리"],
+    inspectionItems: ["기초공사 검측", "철근배근 검측", "콘크리트 타설 검측", "방수공사 검측", "마감공사 검측"],
+    reportFrequency: "주 1회",
+    siteVisitFrequency: "매일 (상주)",
+    residentCount: 2,
+    expectedConstructionStart: "2026.05.01",
+    expectedConstructionEnd: "2027.11.30",
+    linkedConstructionContract: "마포건설(주) — 공사계약 #C-2026-045",
+    specialRequirements: "BIM 기반 검측 보고서, 드론 촬영 월간 보고 포함 희망",
+  },
+};
+
+type BidData = typeof BID_DESIGN | typeof BID_CONSTRUCTION | typeof BID_SUPERVISION;
+
+const BID_MAP: Record<BidField, BidData> = {
+  "설계": BID_DESIGN,
+  "시공": BID_CONSTRUCTION,
+  "감리": BID_SUPERVISION,
 };
 
 const STAGES: { label: string; status: BidStatus }[] = [
@@ -121,7 +253,7 @@ const STAGES: { label: string; status: BidStatus }[] = [
   { label: "마감", status: "종료" },
 ];
 
-const PARTICIPANTS: Participant[] = [
+const PARTICIPANTS_DESIGN: Participant[] = [
   {
     id: 1, name: "아크 건축사사무소",
     portfolioImage: "https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=400&h=300&fit=crop",
@@ -141,6 +273,48 @@ const PARTICIPANTS: Participant[] = [
     keywords: ["종합 설계 가능", "BIM 활용"],
   },
 ];
+
+const PARTICIPANTS_CONSTRUCTION: Participant[] = [
+  {
+    id: 4, name: "대한종합건설(주)",
+    portfolioImage: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=400&h=300&fit=crop",
+    region: "서울 송파구", career: 25, projectCount: 180, bidPrice: 240000, rating: 4.6,
+    keywords: ["RC구조 전문", "근생시설 다수"],
+  },
+  {
+    id: 5, name: "미래건설 주식회사",
+    portfolioImage: "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=400&h=300&fit=crop",
+    region: "서울 강서구", career: 18, projectCount: 95, bidPrice: 255000, rating: 4.7,
+    keywords: ["친환경 인증", "LEED 경험"],
+  },
+];
+
+const PARTICIPANTS_SUPERVISION: Participant[] = [
+  {
+    id: 6, name: "한국건축감리(주)",
+    portfolioImage: "https://images.unsplash.com/photo-1590650153855-d9e808231d41?w=400&h=300&fit=crop",
+    region: "인천 연수구", career: 20, projectCount: 120, bidPrice: 9500, rating: 4.8,
+    keywords: ["상주감리 전문", "BIM 검측"],
+  },
+  {
+    id: 7, name: "세종감리기술단",
+    portfolioImage: "https://images.unsplash.com/photo-1581092921461-eab62e97a780?w=400&h=300&fit=crop",
+    region: "서울 영등포구", career: 15, projectCount: 88, bidPrice: 10200, rating: 4.5,
+    keywords: ["다세대 경험 다수", "드론 검측"],
+  },
+];
+
+const PARTICIPANTS_MAP: Record<BidField, Participant[]> = {
+  "설계": PARTICIPANTS_DESIGN,
+  "시공": PARTICIPANTS_CONSTRUCTION,
+  "감리": PARTICIPANTS_SUPERVISION,
+};
+
+const PARTICIPANT_LABEL: Record<BidField, string> = {
+  "설계": "건축사",
+  "시공": "시공사",
+  "감리": "감리사",
+};
 
 const SORT_OPTIONS = [
   { value: "recommend", label: "추천순" },
@@ -253,7 +427,6 @@ function MilestoneStepper({ currentStage }: { currentStage: number }) {
           const isCurrent = i === currentStage;
           return (
             <div key={stage.label} className="flex items-center flex-1 last:flex-none">
-              {/* Node */}
               <div className="flex flex-col items-center gap-1.5">
                 <div
                   className={`size-3.5 rounded-full transition-all ${
@@ -271,7 +444,6 @@ function MilestoneStepper({ currentStage }: { currentStage: number }) {
                   {stage.label}
                 </span>
               </div>
-              {/* Line */}
               {i < STAGES.length - 1 && (
                 <div className="flex-1 h-[2px] mx-1.5 mt-[-18px]">
                   <div
@@ -358,10 +530,13 @@ function CertCard({ cert }: { cert: Certification }) {
 
 /* ─── Participant Card (Owner View) ─── */
 
-function ParticipantCardOwner({ p }: { p: Participant }) {
+function ParticipantCardOwner({ p, bidId, field, bidStatus }: { p: Participant; bidId: number; field: BidField; bidStatus: BidStatus }) {
+  const priceDisplay = field === "시공"
+    ? `${(p.bidPrice / 10000).toFixed(1)}억원`
+    : `${p.bidPrice.toLocaleString()}만원`;
+
   return (
     <div className="flex gap-4 py-5">
-      {/* Portfolio thumbnail */}
       <Link to={`/partners/${p.id}`} className="w-[120px] h-[90px] shrink-0 overflow-hidden rounded-xl">
         <img
           src={p.portfolioImage}
@@ -394,17 +569,15 @@ function ParticipantCardOwner({ p }: { p: Participant }) {
         </div>
 
         <div className="flex items-center justify-between mt-3">
-          <p className="text-sm font-semibold">
-            {p.bidPrice.toLocaleString()}만원
-          </p>
+          <p className="text-sm font-semibold">{priceDisplay}</p>
           <div className="flex gap-2">
-            <Link to={`/bids/${BID.id}/proposals/${p.id}`}>
+            <Link to={`/bids/${bidId}/proposals/${p.id}`}>
               <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs">
                 제안 보기
               </Button>
             </Link>
-            {BID.status === "업체선정중" && (
-              <Link to={`/contracts/new?architectId=${p.id}&bidId=${BID.id}`}>
+            {bidStatus === "업체선정중" && (
+              <Link to={`/contracts/new?architectId=${p.id}&bidId=${bidId}&type=${field === "시공" ? "construction" : field === "감리" ? "supervision" : "design"}`}>
                 <Button size="sm" className="h-8 rounded-lg text-xs">
                   계약 요청
                 </Button>
@@ -419,7 +592,11 @@ function ParticipantCardOwner({ p }: { p: Participant }) {
 
 /* ─── Participant Card (Architect View — own) ─── */
 
-function ParticipantCardSelf({ p }: { p: Participant }) {
+function ParticipantCardSelf({ p, field }: { p: Participant; field: BidField }) {
+  const priceDisplay = field === "시공"
+    ? `${(p.bidPrice / 10000).toFixed(1)}억원`
+    : `${p.bidPrice.toLocaleString()}만원`;
+
   return (
     <div className="flex gap-4 py-5 bg-primary/[0.03] -mx-2 px-2 rounded-xl">
       <div className="w-[120px] h-[90px] shrink-0 overflow-hidden rounded-xl">
@@ -437,7 +614,7 @@ function ParticipantCardSelf({ p }: { p: Participant }) {
             </p>
           </div>
         </div>
-        <p className="text-sm font-semibold mt-2">{p.bidPrice.toLocaleString()}만원</p>
+        <p className="text-sm font-semibold mt-2">{priceDisplay}</p>
       </div>
     </div>
   );
@@ -464,10 +641,123 @@ function ParticipantCardAnonymous({ index }: { index: number }) {
 }
 
 /* ═══════════════════════════════════════════════
+   Construction Requirements Section
+   ═══════════════════════════════════════════════ */
+
+function ConstructionRequirements({ data }: { data: NonNullable<typeof BID_CONSTRUCTION.construction> }) {
+  return (
+    <section className="py-6" aria-labelledby="construction-req-title">
+      <h3 id="construction-req-title" className="text-base font-semibold mb-5">시공 요구사항</h3>
+      <div className="space-y-5">
+        <div className="flex items-start gap-3">
+          <HardHat className="size-5 text-muted-foreground mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium mb-1">구조 유형</p>
+            <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium">{data.structureType}</span>
+          </div>
+        </div>
+
+        <ChipGroup icon={<Hammer className="size-5" />} label="공사 공법" items={data.constructionMethods} />
+        <ChipGroup icon={<Box className="size-5" />} label="주요 자재" items={data.majorMaterials} />
+        <ChipGroup icon={<Paintbrush className="size-5" />} label="인테리어 범위" items={data.interiorScopes} />
+        <ChipGroup icon={<Zap className="size-5" />} label="설비 범위 (MEP)" items={data.mepScopes} />
+
+        <div className="flex items-start gap-3">
+          <Timer className="size-5 text-muted-foreground mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium mb-1">희망 공사기간</p>
+            <span className="text-sm text-muted-foreground">{data.desiredDuration}개월</span>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3">
+          <FileText className="size-5 text-muted-foreground mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium mb-1">설계도서 확보 여부</p>
+            <span className={`rounded-full px-3 py-1 text-xs font-medium ${data.hasDesignDocs ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"}`}>
+              {data.hasDesignDocs ? "확보 완료" : "미확보"}
+            </span>
+          </div>
+        </div>
+
+        {data.specialRequirements && (
+          <div className="flex items-start gap-3">
+            <Wrench className="size-5 text-muted-foreground mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium mb-1">특수 요구사항</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{data.specialRequirements}</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   Supervision Requirements Section
+   ═══════════════════════════════════════════════ */
+
+function SupervisionRequirements({ data }: { data: NonNullable<typeof BID_SUPERVISION.supervision> }) {
+  return (
+    <section className="py-6" aria-labelledby="supervision-req-title">
+      <h3 id="supervision-req-title" className="text-base font-semibold mb-5">감리 요구사항</h3>
+      <div className="space-y-5">
+        <div className="flex items-start gap-3">
+          <Eye className="size-5 text-muted-foreground mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium mb-1">감리 유형</p>
+            <span className="rounded-full bg-blue-500/10 text-blue-700 px-3 py-1 text-xs font-medium">{data.supervisionType}</span>
+          </div>
+        </div>
+
+        <ChipGroup icon={<ClipboardCheck className="size-5" />} label="감리 범위" items={data.supervisionScopes} />
+        <ChipGroup icon={<FileBarChart className="size-5" />} label="검측 항목" items={data.inspectionItems} />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0">
+          <InfoItem icon={<FileText className="size-5" />} label="보고 주기" value={data.reportFrequency} />
+          <InfoItem icon={<Calendar className="size-5" />} label="현장 방문 빈도" value={data.siteVisitFrequency} />
+          <InfoItem icon={<UserCheck className="size-5" />} label="상주 인원" value={`${data.residentCount}명`} />
+          <InfoItem icon={<CalendarDays className="size-5" />} label="예상 공사기간" value={`${data.expectedConstructionStart} ~ ${data.expectedConstructionEnd}`} />
+        </div>
+
+        {data.linkedConstructionContract && (
+          <div className="flex items-start gap-3">
+            <HardHat className="size-5 text-muted-foreground mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium mb-1">연계 시공계약</p>
+              <p className="text-sm text-muted-foreground">{data.linkedConstructionContract}</p>
+            </div>
+          </div>
+        )}
+
+        {data.specialRequirements && (
+          <div className="flex items-start gap-3">
+            <Wrench className="size-5 text-muted-foreground mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium mb-1">특수 요구사항</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{data.specialRequirements}</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════════
    Page
    ═══════════════════════════════════════════════ */
 
 export default function BidDetailPage() {
+  const [searchParams] = useSearchParams();
+  const fieldParam = searchParams.get("field") as BidField | null;
+  const field: BidField = fieldParam && BID_MAP[fieldParam] ? fieldParam : "설계";
+
+  const BID = BID_MAP[field];
+  const PARTICIPANTS = PARTICIPANTS_MAP[field];
+  const participantLabel = PARTICIPANT_LABEL[field];
+
   const [liked, setLiked] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState("recommend");
@@ -479,13 +769,23 @@ export default function BidDetailPage() {
 
   const participantCountText =
     PARTICIPANTS.length >= 3
-      ? `참여 건축사 ${PARTICIPANTS.length}명`
+      ? `참여 ${participantLabel} ${PARTICIPANTS.length}명`
       : PARTICIPANTS.length > 0
-        ? "참여 건축사 3명 미만"
-        : "아직 참여한 건축사가 없습니다";
+        ? `참여 ${participantLabel} 3명 미만`
+        : `아직 참여한 ${participantLabel}가 없습니다`;
 
   function openLightbox(idx: number) { setLightboxIndex(idx); }
   function closeLightbox() { setLightboxIndex(null); }
+
+  const feeDisplay = field === "시공"
+    ? `${(BID.feeMin / 10000).toFixed(0)}~${(BID.feeMax / 10000).toFixed(0)}억원`
+    : `${BID.feeMin.toLocaleString()}~${BID.feeMax.toLocaleString()}만원`;
+
+  const subScopeLabel: Record<BidField, string> = {
+    "설계": "설계 구분",
+    "시공": "시공 구분",
+    "감리": "감리 유형",
+  };
 
   return (
     <div className="min-h-svh bg-background">
@@ -511,6 +811,24 @@ export default function BidDetailPage() {
           <ArrowLeft className="size-3.5" />
           목록으로
         </Link>
+
+        {/* ═══ Category Switch (for mockup demo) ═══ */}
+        <div className="flex items-center gap-2 mb-5">
+          {(["설계", "시공", "감리"] as BidField[]).map((f) => (
+            <Link
+              key={f}
+              to={`/bids/1?field=${f}`}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
+                field === f
+                  ? "bg-foreground text-background"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {f}
+            </Link>
+          ))}
+          <span className="text-xs text-muted-foreground ml-2">← 분야별 목업 전환</span>
+        </div>
 
         {/* ═══ 1. Title Bar ═══ */}
         <div className="flex items-start justify-between gap-4 mb-5 animate-fade-up">
@@ -592,7 +910,9 @@ export default function BidDetailPage() {
                 className="size-14 rounded-full object-cover"
               />
               <div className="flex-1 min-w-0">
-                <h3 className="text-base font-semibold">건축주 {BID.poster.name}님의 프로젝트</h3>
+                <h3 className="text-base font-semibold">
+                  {field === "시공" ? "도급인" : field === "감리" ? "위탁인" : "건축주"} {BID.poster.name}님의 프로젝트
+                </h3>
                 <p className="text-sm text-muted-foreground">
                   가입일: {BID.poster.joinDate} &middot; 인증 {certDone}/{certTotal}
                 </p>
@@ -621,9 +941,7 @@ export default function BidDetailPage() {
               <h3 id="basic-info-title" className="text-base font-semibold mb-4">기본 정보</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0">
                 <InfoItem icon={<Target className="size-5" />} label="입찰 분야" value={BID.field} />
-                {BID.field === "설계" && (
-                  <InfoItem icon={<PenTool className="size-5" />} label="설계 구분" value={BID.designScope} />
-                )}
+                <InfoItem icon={<PenTool className="size-5" />} label={subScopeLabel[field]} value={BID.subScope} />
                 <InfoItem icon={<MapPin className="size-5" />} label="부지 소재지" value={BID.address} />
                 <InfoItem icon={<Users className="size-5" />} label="입찰 방식" value={`${BID.bidType}입찰`} />
                 <InfoItem icon={<Home className="size-5" />} label="사업 용도" value={BID.businessUse} />
@@ -633,13 +951,17 @@ export default function BidDetailPage() {
                 <InfoItem icon={<TrendingUp className="size-5" />} label="층수" value={`지상 ${BID.floors.above}층 / 지하 ${BID.floors.below}층`} />
                 <InfoItem icon={<ParkingCircle className="size-5" />} label="주차 계획" value={`${BID.parking.type} ${BID.parking.count}대`} />
                 <InfoItem icon={<CalendarDays className="size-5" />} label="모집 유효 기간" value={`${BID.recruitStart} ~ ${BID.recruitEnd}`} />
+                <InfoItem icon={<Banknote className="size-5" />} label="총 건축 사업비" value={`${(BID.totalBuildCost / 10000).toLocaleString()}억원`} />
+                <InfoItem icon={<Banknote className="size-5" />} label={`희망 ${BID.feeLabel}`} value={feeDisplay} />
 
-                {/* 분야별 추가 정보 */}
-                {BID.field === "설계" && (
-                  <>
-                    <InfoItem icon={<Banknote className="size-5" />} label="총 건축 사업비" value={`${(BID.totalBuildCost / 10000).toLocaleString()}억원`} />
-                    <InfoItem icon={<Banknote className="size-5" />} label="희망 설계비" value={`${BID.designFeeMin.toLocaleString()} ~ ${BID.designFeeMax.toLocaleString()}만원`} />
-                  </>
+                {/* 시공 전용: 희망 공사기간 */}
+                {field === "시공" && BID.construction && (
+                  <InfoItem icon={<Timer className="size-5" />} label="희망 공사기간" value={`${(BID.construction as NonNullable<typeof BID_CONSTRUCTION.construction>).desiredDuration}개월`} />
+                )}
+
+                {/* 감리 전용: 예상 공사기간 */}
+                {field === "감리" && BID.supervision && (
+                  <InfoItem icon={<Calendar className="size-5" />} label="예상 공사기간" value={`${(BID.supervision as NonNullable<typeof BID_SUPERVISION.supervision>).expectedConstructionStart} ~ ${(BID.supervision as NonNullable<typeof BID_SUPERVISION.supervision>).expectedConstructionEnd}`} />
                 )}
               </div>
             </section>
@@ -647,10 +969,10 @@ export default function BidDetailPage() {
             <Separator />
 
             {/* ── 요구사항 (설계 분야) ── */}
-            {BID.field === "설계" && (
+            {field === "설계" && (
               <>
                 <section className="py-6" aria-labelledby="requirements-title">
-                  <h3 id="requirements-title" className="text-base font-semibold mb-5">요구사항</h3>
+                  <h3 id="requirements-title" className="text-base font-semibold mb-5">설계 요구사항</h3>
                   <div className="space-y-5">
                     <ChipGroup icon={<FileText className="size-5" />} label="요구 성과품" items={BID.deliverables} />
                     <ChipGroup icon={<Palette className="size-5" />} label="건축 스타일" items={BID.styles} />
@@ -658,6 +980,22 @@ export default function BidDetailPage() {
                     <ChipGroup icon={<Box className="size-5" />} label="외장재 선호" items={BID.exteriors} />
                   </div>
                 </section>
+                <Separator />
+              </>
+            )}
+
+            {/* ── 요구사항 (시공 분야) ── */}
+            {field === "시공" && BID.construction && (
+              <>
+                <ConstructionRequirements data={BID.construction} />
+                <Separator />
+              </>
+            )}
+
+            {/* ── 요구사항 (감리 분야) ── */}
+            {field === "감리" && BID.supervision && (
+              <>
+                <SupervisionRequirements data={BID.supervision} />
                 <Separator />
               </>
             )}
@@ -711,7 +1049,6 @@ export default function BidDetailPage() {
 
             {/* ── 참여사 목록 ── */}
             <section className="py-6" aria-labelledby="participants-title">
-              {/* Header */}
               <div className="flex items-center justify-between mb-2">
                 <h3 id="participants-title" className="text-base font-semibold">
                   {participantCountText}
@@ -727,7 +1064,6 @@ export default function BidDetailPage() {
                 )}
               </div>
 
-              {/* Sort bar (owner view) */}
               {CURRENT_ROLE === "owner" && PARTICIPANTS.length > 0 && (
                 <div className="flex items-center gap-2 mb-3 overflow-x-auto pb-1" role="tablist">
                   {SORT_OPTIONS.map((opt) => (
@@ -748,15 +1084,14 @@ export default function BidDetailPage() {
                 </div>
               )}
 
-              {/* Participant list */}
               {PARTICIPANTS.length > 0 ? (
                 <div className="divide-y divide-border/50">
                   {CURRENT_ROLE === "owner" &&
-                    PARTICIPANTS.map((p) => <ParticipantCardOwner key={p.id} p={p} />)}
+                    PARTICIPANTS.map((p) => <ParticipantCardOwner key={p.id} p={p} bidId={BID.id} field={field} bidStatus={BID.status} />)}
 
                   {CURRENT_ROLE === "architect-submitted" && (
                     <>
-                      <ParticipantCardSelf p={PARTICIPANTS[0]} />
+                      <ParticipantCardSelf p={PARTICIPANTS[0]} field={field} />
                       {PARTICIPANTS.slice(1).map((_, i) => (
                         <ParticipantCardAnonymous key={i} index={i} />
                       ))}
@@ -767,13 +1102,13 @@ export default function BidDetailPage() {
                     <div className="py-8 text-center text-sm text-muted-foreground">
                       {CURRENT_ROLE === "guest"
                         ? "로그인 후 확인 가능합니다"
-                        : `참여 건축사 ${PARTICIPANTS.length >= 3 ? `${PARTICIPANTS.length}명` : "3명 미만"}`}
+                        : `참여 ${participantLabel} ${PARTICIPANTS.length >= 3 ? `${PARTICIPANTS.length}명` : "3명 미만"}`}
                     </div>
                   )}
                 </div>
               ) : (
                 <div className="py-10 text-center text-sm text-muted-foreground">
-                  아직 제안을 제출한 건축사가 없습니다
+                  아직 제안을 제출한 {participantLabel}가 없습니다
                 </div>
               )}
             </section>
@@ -785,13 +1120,22 @@ export default function BidDetailPage() {
               <div className="rounded-2xl bg-card ring-1 ring-black/[0.08] shadow-sm p-6 space-y-5">
                 {/* Price */}
                 <div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-bold tracking-tight">
-                      {BID.designFeeMin.toLocaleString()}~{BID.designFeeMax.toLocaleString()}
-                    </span>
-                    <span className="text-sm text-muted-foreground">만원</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">희망 설계비 범위</p>
+                  {field === "시공" ? (
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold tracking-tight">
+                        {(BID.feeMin / 10000).toFixed(0)}~{(BID.feeMax / 10000).toFixed(0)}
+                      </span>
+                      <span className="text-sm text-muted-foreground">억원</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold tracking-tight">
+                        {BID.feeMin.toLocaleString()}~{BID.feeMax.toLocaleString()}
+                      </span>
+                      <span className="text-sm text-muted-foreground">만원</span>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-0.5">희망 {BID.feeLabel} 범위</p>
                 </div>
 
                 {/* Info rows */}
@@ -807,7 +1151,7 @@ export default function BidDetailPage() {
                     </div>
                   </div>
                   <div className="p-3 ring-1 ring-black/[0.08]">
-                    <p className="text-[10px] text-muted-foreground font-medium mb-0.5">참여 건축사</p>
+                    <p className="text-[10px] text-muted-foreground font-medium mb-0.5">참여 {participantLabel}</p>
                     <p className="font-medium">
                       {PARTICIPANTS.length >= 3 ? `${PARTICIPANTS.length}사 참여중` : PARTICIPANTS.length > 0 ? "3명 미만 참여중" : "아직 없음"}
                     </p>
