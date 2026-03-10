@@ -4,15 +4,21 @@ use tracing_actix_web::TracingLogger;
 mod config;
 mod db;
 mod errors;
+mod middleware;
 mod models;
 mod routes;
+mod services;
 
 use config::AppConfig;
+use services::ginplus::GinPlusService;
+use services::prom::PromService;
 
 pub struct AppState {
     pub db: sqlx::PgPool,
     pub s3: aws_sdk_s3::Client,
     pub config: AppConfig,
+    pub ginplus: GinPlusService,
+    pub prom: PromService,
 }
 
 #[actix_web::main]
@@ -36,6 +42,14 @@ async fn main() -> anyhow::Result<()> {
 
     let s3_client = create_s3_client(&config).await;
 
+    let ginplus = GinPlusService::new(
+        config.ginplus_base_url.clone(),
+        config.ginplus_api_key.clone(),
+        config.ginplus_company_name.clone(),
+    );
+
+    let prom = PromService::new(config.prom_base_url.clone());
+
     let bind_addr = format!("{}:{}", config.server_host, config.server_port);
     tracing::info!("Starting server at http://{}", bind_addr);
 
@@ -43,6 +57,8 @@ async fn main() -> anyhow::Result<()> {
         db: db_pool,
         s3: s3_client,
         config,
+        ginplus,
+        prom,
     });
 
     HttpServer::new(move || {
